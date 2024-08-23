@@ -2,11 +2,13 @@ import React, { useRef, useEffect } from "react";
 
 const INITIAL_POSITION = { x: 0, y: 0 };
 const PIN_POSITION = { x: 700, y: 400 }; // 지도 상의 핀 위치 (고정)
-const MAP_SIZE = 1600; // 지도의 크기
-const CANVAS_SIZE = 500; // 캔버스의 크기
+const MAP_SIZE = 1000; // 지도의 크기
 const PAN_SENSITIVITY = 0.8; // 이동할 때 민감도 설정
-const MAP_WIDTH = 1200;
-const MAP_HEIGHT = 1300;
+const MAP_WIDTH = 2336;
+const MAP_HEIGHT = 2481;
+// MAP_WIDTH_LIMIT, MAP_HEIGHT_LIMIT 매직넘버임. 왜 작동하는지모름.
+const MAP_WIDTH_LIMIT = 1300;
+const MAP_HEIGHT_LIMIT = 1450;
 const PIN_SIZE = 100; // 핀 이미지 크기 설정
 
 function MapWithPin() {
@@ -14,6 +16,27 @@ function MapWithPin() {
   const viewPosRef = useRef(INITIAL_POSITION);
   const isPanningRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
+  const canvasSizeRef = useRef<number>(0); // 캔버스 크기 상태 추가
+
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        // 캔버스 크기를 반응형으로 조정
+        const canvasSize = window.innerWidth * 0.8;
+        canvasSizeRef.current = canvasSize;
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+      }
+    };
+
+    handleResize(); // 초기 로드 시 캔버스 크기 설정
+    window.addEventListener("resize", handleResize); // 윈도우 리사이즈 이벤트 추가
+
+    return () => {
+      window.removeEventListener("resize", handleResize); // 클린업
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,22 +62,24 @@ function MapWithPin() {
         MAP_SIZE,
         0,
         0,
-        CANVAS_SIZE,
-        CANVAS_SIZE
+        canvasSizeRef.current,
+        canvasSizeRef.current
       );
 
       // 핀 위치 계산
       const relativePinX =
-        (PIN_POSITION.x - viewPosRef.current.x) * (CANVAS_SIZE / MAP_SIZE);
+        (PIN_POSITION.x - viewPosRef.current.x) *
+        (canvasSizeRef.current / MAP_SIZE);
       const relativePinY =
-        (PIN_POSITION.y - viewPosRef.current.y) * (CANVAS_SIZE / MAP_SIZE);
+        (PIN_POSITION.y - viewPosRef.current.y) *
+        (canvasSizeRef.current / MAP_SIZE);
 
       // 핀이 캔버스 안에 있을 때만 그리기
       if (
         relativePinX >= 0 &&
-        relativePinX <= CANVAS_SIZE &&
+        relativePinX <= canvasSizeRef.current &&
         relativePinY >= 0 &&
-        relativePinY <= CANVAS_SIZE
+        relativePinY <= canvasSizeRef.current
       ) {
         const pinSize = 100; // 핀 이미지 크기 설정
         ctx.drawImage(
@@ -85,6 +110,7 @@ function MapWithPin() {
     const handleMouseUp = () => {
       isPanningRef.current = false;
     };
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isPanningRef.current) return;
 
@@ -96,13 +122,48 @@ function MapWithPin() {
       const newViewPosX = viewPosRef.current.x - deltaX;
       const newViewPosY = viewPosRef.current.y - deltaY;
 
-      // 뷰포트 제한 설정
       const limitedViewPosX = Math.max(
-        Math.min(newViewPosX, MAP_WIDTH - CANVAS_SIZE),
+        Math.min(newViewPosX, MAP_WIDTH_LIMIT),
         0
       );
       const limitedViewPosY = Math.max(
-        Math.min(newViewPosY, MAP_HEIGHT - CANVAS_SIZE),
+        Math.min(newViewPosY, MAP_HEIGHT_LIMIT),
+        0
+      );
+      viewPosRef.current = { x: limitedViewPosX, y: limitedViewPosY };
+      draw();
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      isPanningRef.current = true;
+
+      const touch = e.touches[0];
+      startPosRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+    };
+
+    const handleTouchEnd = () => {
+      isPanningRef.current = false;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isPanningRef.current) return;
+
+      const touch = e.touches[0];
+      const deltaX = (touch.clientX - startPosRef.current.x) * PAN_SENSITIVITY;
+      const deltaY = (touch.clientY - startPosRef.current.y) * PAN_SENSITIVITY;
+
+      const newViewPosX = viewPosRef.current.x - deltaX;
+      const newViewPosY = viewPosRef.current.y - deltaY;
+      const limitedViewPosX = Math.max(
+        Math.min(newViewPosX, MAP_WIDTH_LIMIT),
+        0
+      );
+      const limitedViewPosY = Math.max(
+        Math.min(newViewPosY, MAP_HEIGHT_LIMIT),
         0
       );
 
@@ -119,9 +180,11 @@ function MapWithPin() {
 
       // 핀 이미지의 캔버스 내 상대적 위치
       const relativePinX =
-        (PIN_POSITION.x - viewPosRef.current.x) * (CANVAS_SIZE / MAP_SIZE);
+        (PIN_POSITION.x - viewPosRef.current.x) *
+        (canvasSizeRef.current / MAP_SIZE);
       const relativePinY =
-        (PIN_POSITION.y - viewPosRef.current.y) * (CANVAS_SIZE / MAP_SIZE);
+        (PIN_POSITION.y - viewPosRef.current.y) *
+        (canvasSizeRef.current / MAP_SIZE);
 
       // 핀 이미지의 영역을 계산
       const pinLeft = relativePinX - PIN_SIZE / 2;
@@ -140,28 +203,32 @@ function MapWithPin() {
       }
     };
 
+    // 마우스 이벤트
     canvas?.addEventListener("mousedown", handleMouseDown);
     canvas?.addEventListener("mouseup", handleMouseUp);
     canvas?.addEventListener("mousemove", handleMouseMove);
     canvas?.addEventListener("click", handleClick);
+
+    // 터치 이벤트
+    canvas?.addEventListener("touchstart", handleTouchStart);
+    canvas?.addEventListener("touchend", handleTouchEnd);
+    canvas?.addEventListener("touchmove", handleTouchMove);
 
     return () => {
       canvas?.removeEventListener("mousedown", handleMouseDown);
       canvas?.removeEventListener("mouseup", handleMouseUp);
       canvas?.removeEventListener("mousemove", handleMouseMove);
       canvas?.removeEventListener("click", handleClick);
+      canvas?.removeEventListener("touchstart", handleTouchStart);
+      canvas?.removeEventListener("touchend", handleTouchEnd);
+      canvas?.removeEventListener("touchmove", handleTouchMove);
     };
   }, []);
 
   return (
     <div>
       <h1>동박!</h1>
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        style={{ border: "1px solid black" }}
-      />
+      <canvas ref={canvasRef} style={{ border: "1px solid black" }} />
     </div>
   );
 }
