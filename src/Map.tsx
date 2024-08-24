@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from "react";
 
 const INITIAL_POSITION = { x: 0, y: 0 };
 const MAP_SIZE = 1000;
-const PAN_SENSITIVITY = 0.8;
+const PAN_SENSITIVITY = 2.5;
 const MAP_WIDTH = 2336;
 const MAP_HEIGHT = 2481;
 const MAP_WIDTH_LIMIT = 1300;
@@ -158,6 +158,11 @@ function MapWithPin() {
       const deltaX = (e.clientX - startPosRef.current.x) * PAN_SENSITIVITY;
       const deltaY = (e.clientY - startPosRef.current.y) * PAN_SENSITIVITY;
 
+      startPosRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+      };
+
       const newViewPosX = viewPosRef.current.x - deltaX;
       const newViewPosY = viewPosRef.current.y - deltaY;
 
@@ -187,7 +192,6 @@ function MapWithPin() {
     const handleTouchEnd = () => {
       isPanningRef.current = false;
     };
-
     const handleTouchMove = (e: TouchEvent) => {
       if (!isPanningRef.current) return;
 
@@ -195,8 +199,14 @@ function MapWithPin() {
       const deltaX = (touch.clientX - startPosRef.current.x) * PAN_SENSITIVITY;
       const deltaY = (touch.clientY - startPosRef.current.y) * PAN_SENSITIVITY;
 
+      startPosRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+
       const newViewPosX = viewPosRef.current.x - deltaX;
       const newViewPosY = viewPosRef.current.y - deltaY;
+
       const limitedViewPosX = Math.max(
         Math.min(newViewPosX, MAP_WIDTH_LIMIT),
         0
